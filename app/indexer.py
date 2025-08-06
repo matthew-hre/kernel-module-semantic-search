@@ -8,7 +8,7 @@ class ModuleIndexer:
         self.modules = modules
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
         self.embeddings = self.model.encode(
-            [f"{m['name']}: {m['desc']}" for m in self.modules]
+            [f"{m['config']}: {m['desc']}" for m in self.modules]
         )
         self.index = self._build_index()
 

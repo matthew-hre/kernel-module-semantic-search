@@ -12,7 +12,7 @@ class KernelModuleSearchApp(App):
         super().__init__()
         self.modules = get_all_modules()
         if not self.modules:
-            self.modules = [{"name": "error", "desc": "No modules found", "path": ""}]
+            self.modules = [{"config": "ERROR", "desc": "No modules found", "path": ""}]
         self.indexer = ModuleIndexer(self.modules)
 
     def compose(self) -> ComposeResult:
@@ -21,7 +21,7 @@ class KernelModuleSearchApp(App):
             Input(placeholder="Search kernel modules...", id="search_input"),
             ListView(
                 *[
-                    ListItem(Static(f"{m['name']}: {m['desc']}"))
+                    ListItem(Static(f"{m['config']}: {m['desc']}"))
                     for m in self.modules[:50]
                 ],
                 id="results_list",
@@ -36,8 +36,8 @@ class KernelModuleSearchApp(App):
 
         if not query:
             for m in self.modules[:50]:
-                results_widget.append(ListItem(Static(f"{m['name']}: {m['desc']}")))
+                results_widget.append(ListItem(Static(f"{m['config']}: {m['desc']}")))
         else:
             results = self.indexer.search(query)
             for mod in results:
-                results_widget.append(ListItem(Static(f"{mod['name']}: {mod['desc']}")))
+                results_widget.append(ListItem(Static(f"{mod['config']}: {mod['desc']}")))

@@ -1,3 +1,5 @@
 __pycache__/
 .env
 dist/
+linux-src-dev
+linux-src
