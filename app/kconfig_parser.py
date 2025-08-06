@@ -1,9 +1,7 @@
-# -- app/kconfig_parser.py --
 import os
 import re
 import glob
 import subprocess
-import tempfile
 
 def find_kconfig_files(root):
     kconfigs = []
@@ -73,11 +71,8 @@ def extract_all_configs(root):
     return all_configs
 
 def get_module_info_via_modinfo(module_path):
-    """Extract module description using modinfo command"""
     try:
-        # For compressed modules, we need to decompress them first
         if module_path.endswith('.xz'):
-            # Use modinfo directly on the compressed file - it should handle it
             result = subprocess.run(['modinfo', module_path], 
                                    capture_output=True, text=True, timeout=5)
             if result.returncode == 0:
@@ -110,21 +105,29 @@ def parse_builtin_modinfo(modinfo_path):
             entries.append(current)
     return entries
 
-def generate_module_index(kconfig_root, modules_root):
+def generate_module_index(kconfig_root, modules_root, progress_callback=None):
+    if progress_callback:
+        progress_callback("Parsing Kconfig files...", 15)
+    
     configs = extract_all_configs(kconfig_root)
     config_map = {c["symbol"].lower(): c for c in configs}
     
     print(f"DEBUG: Found {len(configs)} Kconfig entries")
     print(f"DEBUG: Sample config keys: {list(config_map.keys())[:10]}")
 
+    if progress_callback:
+        progress_callback("Scanning module files...", 25)
+
     module_paths = glob.glob(modules_root + "/**/*.ko*", recursive=True)
     print(f"Found {len(module_paths)} compressed .ko files")
+
+    if progress_callback:
+        progress_callback("Loading builtin module info...", 30)
 
     builtin_info_path = os.path.join(os.path.dirname(modules_root), "modules.builtin.modinfo")
     print(f"DEBUG: Looking for builtin modinfo at: {builtin_info_path}")
     print(f"DEBUG: Builtin modinfo exists: {os.path.exists(builtin_info_path)}")
     
-    # Try alternative paths for builtin modinfo
     if not os.path.exists(builtin_info_path):
         alt_paths = [
             os.path.join(os.path.dirname(os.path.dirname(modules_root)), "modules.builtin.modinfo"),
@@ -140,13 +143,21 @@ def generate_module_index(kconfig_root, modules_root):
     builtin_entries = parse_builtin_modinfo(builtin_info_path)
     print(f"DEBUG: Found {len(builtin_entries)} builtin entries")
 
+    if progress_callback:
+        progress_callback("Processing modules...", 35)
+
     module_index = []
     matched_count = 0
     builtin_matched_count = 0
     modinfo_matched_count = 0
     
+    total_modules = len(module_paths)
     for i, path in enumerate(module_paths):
-        if i < 5:  # Debug first 5 modules
+        if progress_callback and i % 100 == 0:
+            progress_percent = 35 + int((i / total_modules) * 5)
+            progress_callback(f"Processing modules... ({i}/{total_modules})", progress_percent)
+        
+        if i < 5:
             print(f"DEBUG: Processing module {i+1}: {path}")
         
         filename = os.path.basename(path)
@@ -155,7 +166,6 @@ def generate_module_index(kconfig_root, modules_root):
         if i < 5:
             print(f"DEBUG: Module name extracted: '{modname}'")
 
-        # Try matching against Kconfig
         matched_config = None
         for key in config_map:
             if modname in key.lower() or key.lower() in modname:
@@ -165,7 +175,6 @@ def generate_module_index(kconfig_root, modules_root):
                     print(f"DEBUG: Found Kconfig match for '{modname}': {key}")
                 break
 
-        # Try matching against builtin modinfo
         modinfo_entry = next((m for m in builtin_entries if m.get("name", "").lower() == modname), None)
         if modinfo_entry:
             builtin_matched_count += 1
@@ -178,7 +187,6 @@ def generate_module_index(kconfig_root, modules_root):
         elif modinfo_entry and "description" in modinfo_entry:
             desc = modinfo_entry["description"]
         else:
-            # Try using modinfo command
             modinfo_desc = get_module_info_via_modinfo(path)
             if modinfo_desc:
                 desc = modinfo_desc

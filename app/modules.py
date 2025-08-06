@@ -1,12 +1,10 @@
 import os
 from app.kconfig_parser import generate_module_index
 
-def get_all_modules():
+def get_all_modules(progress_callback=None):
     kernel_version = os.uname().release
 
-    # NixOS-style path
     nixos_path = f"/run/current-system/kernel-modules/lib/modules/{kernel_version}/kernel"
-    # Fallback for non-Nix systems
     fallback_path = f"/lib/modules/{kernel_version}/kernel"
 
     if os.path.exists(nixos_path):
@@ -16,11 +14,8 @@ def get_all_modules():
     else:
         raise RuntimeError("No kernel module tree found.")
 
-    # Kernel source path — expected to be provided via `nix build nixpkgs#linux.dev`
-    # Try different possible paths for the kernel source
     kconfig_root = os.path.realpath("./linux-src-dev")
     if not os.path.isdir(kconfig_root):
-        # If the symlink doesn't work, try to find the source via the modules path
         modules_source_path = f"/run/current-system/kernel-modules/lib/modules/{kernel_version}/source"
         if os.path.isdir(modules_source_path):
             kconfig_root = modules_source_path
@@ -34,4 +29,4 @@ def get_all_modules():
     if not os.path.isdir(kconfig_root):
         raise RuntimeError("Expected kernel source in ./linux-src. Please run `nix build nixpkgs#linux.dev --impure -o linux-src`")
 
-    return generate_module_index(kconfig_root, modules_root)
+    return generate_module_index(kconfig_root, modules_root, progress_callback)
